@@ -33,14 +33,20 @@ jobs:
         with:
           node-version: 20
 
-      - name: Mask sensitive values
+      - name: Mask Password
         run: |
-          echo "::add-mask::${{ github.event.inputs.download_url }}"
-          echo "::add-mask::${{ github.event.inputs.archive_password }}"
+          PSWD=$(jq -r '.inputs.archive_password' $GITHUB_EVENT_PATH)
+          echo ::add-mask::$PSWD
+          echo PSWD=$PSWD >> $GITHUB_ENV
+      - name: Mask Url
+        run: |
+          URL=$(jq -r '.inputs.download_url' $GITHUB_EVENT_PATH)
+          echo ::add-mask::$URL
+          echo URL=$URL >> $GITHUB_ENV
 
       - name: Run downloader
         run: |
-          node downloader.js "${{ github.event.inputs.download_url }}" "${{ github.event.inputs.archive_password }}"
+          node downloader.js "${{ env.URL }}" "${{ env.PSWD }}"
 
       - name: Commit and Push files
         run: |

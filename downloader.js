@@ -39,7 +39,6 @@ const sevenZipCmd = check7zip();
 // دانلود فایل
 function downloadFile(url, outputPath) {
     return new Promise((resolve, reject) => {
-        console.log(`📥 شروع دانلود از: ${url}`);
 
         const parsedUrl = new URL(url);
         const protocol = parsedUrl.protocol === 'https:' ? https : http;
@@ -57,7 +56,7 @@ function downloadFile(url, outputPath) {
             }
 
             if (response.statusCode !== 200) {
-                reject(new Error(`خطای دانلود: ${response.statusCode}`));
+                reject(new Error(`Error: ${response.statusCode}`));
                 return;
             }
 
@@ -67,7 +66,7 @@ function downloadFile(url, outputPath) {
                 downloadedSize += chunk.length;
                 if (totalSize) {
                     const percent = ((downloadedSize / totalSize) * 100).toFixed(2);
-                    process.stdout.write(`\r📊 پیشرفت: ${percent}% (${(downloadedSize / 1024 / 1024).toFixed(2)} MB)`);
+                    process.stdout.write(`\r📊 Progress: ${percent}% (${(downloadedSize / 1024 / 1024).toFixed(2)} MB)`);
                 }
             });
 
@@ -75,7 +74,7 @@ function downloadFile(url, outputPath) {
 
             file.on('finish', () => {
                 file.close();
-                console.log('\n✅ دانلود کامل شد');
+                console.log('\n✅ Download completed');
                 resolve(outputPath);
             });
         }).on('error', (err) => {
@@ -87,7 +86,7 @@ function downloadFile(url, outputPath) {
 
 // فشرده‌سازی با 7zip
 function compressFile(inputFile, password) {
-    console.log('\n🗜️  شروع فشرده‌سازی...');
+    console.log('\n🗜️  Compressing...');
 
     const outputBase = path.basename(inputFile, path.extname(inputFile));
     const outputArchive = `${outputBase}.7z`;
@@ -95,11 +94,11 @@ function compressFile(inputFile, password) {
     try {
         // فشرده‌سازی با پارت‌های 50MB و رمز عبور
         const cmd = `${sevenZipCmd} a -t7z -v50m -p"${password}" -mhe=on "${outputArchive}" "${inputFile}"`;
-        console.log('🔐 اعمال رمز عبور و تقسیم به پارت‌های 50MB...');
+        console.log('🔐 Splitting to 50MB...');
 
         execSync(cmd, { stdio: 'inherit' });
 
-        console.log('✅ فشرده‌سازی کامل شد');
+        console.log('✅ Spliting Completed');
 
         // لیست فایل‌های پارت شده
         const parts = fs.readdirSync('.')
@@ -125,15 +124,14 @@ async function main() {
         // فشرده‌سازی
         const parts = compressFile(outputPath, password);
 
-        console.log('\n📦 فایل‌های ایجاد شده:');
+        console.log('\n📦 Created files:');
         parts.forEach(part => console.log(`  - ${part}`));
 
         // حذف فایل اصلی
         fs.unlinkSync(outputPath);
-        console.log('\n🗑️  فایل اصلی حذف شد');
+        console.log('\n🗑️  Main file deleted');
 
-        console.log('\n✨ عملیات با موفقیت انجام شد!');
-        console.log(`🔑 رمز عبور: ${password}`);
+        console.log('\n✨ Operation completed!');
     } catch (error) {
         console.error('\n❌ خطا:', error.message);
         process.exit(1);
