@@ -11,6 +11,7 @@ const { URL } = require('url');
 const args = process.argv.slice(2);
 const downloadUrl = args[0];
 const password = args[1] || 'default_password_123';
+const cookies = args[2];
 
 if (!downloadUrl) {
     console.error('❌ لطفا لینک دانلود را وارد کنید');
@@ -37,8 +38,9 @@ function check7zip() {
 const sevenZipCmd = check7zip();
 
 // دانلود فایل
-function downloadFile(url, outputPath) {
+function downloadFile(url, outputPath, headers = {}) {
     return new Promise((resolve, reject) => {
+        console.log(`📥 Starting download from: ${url}`);
 
         const parsedUrl = new URL(url);
         const protocol = parsedUrl.protocol === 'https:' ? https : http;
@@ -46,18 +48,33 @@ function downloadFile(url, outputPath) {
         const file = fs.createWriteStream(outputPath);
         let downloadedSize = 0;
 
-        protocol.get(url, (response) => {
-            if (response.statusCode === 302 || response.statusCode === 301) {
+        // Prepare request options with headers
+        const options = {
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ...headers // Merge custom headers
+            }
+        };
+
+        const request = protocol.request(options, (response) => {
+            // Handle redirects
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                console.log(`   Redirected to: ${response.headers.location}`);
                 file.close();
                 fs.unlinkSync(outputPath);
-                return downloadFile(response.headers.location, outputPath)
+                return downloadFile(response.headers.location, outputPath, headers) // Pass headers to redirect
                     .then(resolve)
                     .catch(reject);
             }
 
+            // Handle HTTP errors
             if (response.statusCode !== 200) {
-                reject(new Error(`Error: ${response.statusCode}`));
-                return;
+                fs.unlinkSync(outputPath);
+                return reject(new Error(`Download failed. Status Code: ${response.statusCode}`));
             }
 
             const totalSize = parseInt(response.headers['content-length'], 10);
@@ -66,7 +83,11 @@ function downloadFile(url, outputPath) {
                 downloadedSize += chunk.length;
                 if (totalSize) {
                     const percent = ((downloadedSize / totalSize) * 100).toFixed(2);
-                    process.stdout.write(`\r📊 Progress: ${percent}% (${(downloadedSize / 1024 / 1024).toFixed(2)} MB)`);
+                    const downloadedMB = (downloadedSize / 1024 / 1024).toFixed(2);
+                    process.stdout.write(`\r📊 Progress: ${percent}% (${downloadedMB} MB / ${(totalSize / 1024 / 1024).toFixed(2)} MB)`);
+                } else {
+                    const downloadedMB = (downloadedSize / 1024 / 1024).toFixed(2);
+                    process.stdout.write(`\r📊 Progress: ${downloadedMB} MB downloaded`);
                 }
             });
 
@@ -74,16 +95,20 @@ function downloadFile(url, outputPath) {
 
             file.on('finish', () => {
                 file.close();
-                console.log('\n✅ Download completed');
+                process.stdout.write('\n');
+                console.log('✅ Download complete.');
                 resolve(outputPath);
             });
-        }).on('error', (err) => {
+        });
+
+        request.on('error', (err) => {
             fs.unlinkSync(outputPath);
             reject(err);
         });
+
+        request.end();
     });
 }
-
 // فشرده‌سازی با 7zip
 function compressFile(inputFile, password) {
     console.log('\n🗜️  Compressing...');
@@ -118,8 +143,14 @@ async function main() {
         const fileName = path.basename(parsedUrl.pathname) || 'downloaded_file';
         const outputPath = path.join(process.cwd(), fileName);
 
+        let headers = {}
+        if(cookies){
+            headers = {
+                'cookies': cookies
+            }
+        }
         // دانلود
-        await downloadFile(downloadUrl, outputPath);
+        await downloadFile(downloadUrl, outputPath,headers);
 
         // فشرده‌سازی
         const parts = compressFile(outputPath, password);

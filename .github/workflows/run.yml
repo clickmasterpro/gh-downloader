@@ -11,6 +11,10 @@ on:
         description: 'Password'
         required: false
         type: string
+      cookies:
+        description: 'Cookies'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -43,10 +47,15 @@ jobs:
           URL=$(jq -r '.inputs.download_url' $GITHUB_EVENT_PATH)
           echo ::add-mask::$URL
           echo URL=$URL >> $GITHUB_ENV
+      - name: Mask Cookies
+        run: |
+          COOKIES=$(jq -r '.inputs.cookies' $GITHUB_EVENT_PATH)
+          echo ::add-mask::$COOKIES
+          echo COOKIES=$COOKIES >> $GITHUB_ENV
 
       - name: Run downloader
         run: |
-          node downloader.js "${{ env.URL }}" "${{ env.PSWD }}"
+          node downloader.js "${{ env.URL }}" "${{ env.PSWD }}" "${{ env.COOKIES }}"
 
       - name: Commit and Push files
         run: |
