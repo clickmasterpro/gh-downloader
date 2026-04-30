@@ -146,7 +146,7 @@ async function main() {
         let headers = {}
         if(cookies){
             headers = {
-                'cookies': cookies
+                'Cookie': cookies
             }
         }
         // دانلود
