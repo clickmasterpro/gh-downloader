@@ -1,0 +1,51 @@
+name: Cleanup Archives
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deletion:
+        description: 'Type "DELETE" to confirm'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_deletion }}" != "DELETE" ]; then
+            echo "❌ Deletion not confirmed. You must type 'DELETE' to proceed."
+            exit 1
+          fi
+          echo "✅ Deletion confirmed"
+
+      - name: Run cleanup script
+        run: node cleanup.js
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          
+          # Check if there are any changes (deleted files)
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            git add -A
+            git commit -m "🗑️ Remove archive files"
+            git push
+            echo "✅ Changes pushed to repository"
+          else
+            echo "ℹ️ No files were deleted"
+          fi
